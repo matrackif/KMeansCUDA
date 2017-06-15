@@ -13,7 +13,7 @@
 #include <time.h>
 #define MAX_CHAR_PER_LINE 128
 
-float** file_read(int   isBinaryFile,  // flag: 0 or 1 
+float** readFromFile(int   isBinaryFile,  // flag: 0 or 1 
 	char *filename,      // input file name 
 	int  *numObjs,       // num of data objects (local) 
 	int  *numCoords)     // num of coordinates 
@@ -100,8 +100,10 @@ float** file_read(int   isBinaryFile,  // flag: 0 or 1
 
 		/* find the no. objects of each object */
 		(*numCoords) = 0;
-		while (fgets(line, lineLen, infile) != NULL) {
-			if (strtok(line, " \t\n") != 0) {
+		while (fgets(line, lineLen, infile) != NULL) 
+		{
+			if (strtok(line, " \t\n") != 0) 
+			{
 				/* ignore the id (first coordiinate): numCoords = 1; */
 				while (strtok(NULL, " ,\t\n") != NULL) (*numCoords)++;
 				break; /* this makes read from 1st object */
@@ -113,20 +115,23 @@ float** file_read(int   isBinaryFile,  // flag: 0 or 1
 		printf("File %s numCoords = %d\n", filename, *numCoords);
 		
 
-		/* allocate space for objects[][] and read all objects */
+		// allocate space for objects[][] and read all objects 
 		len = (*numObjs) * (*numCoords);
 		objects = (float**)malloc((*numObjs) * sizeof(float*));
 		assert(objects != NULL);
 		objects[0] = (float*)malloc(len * sizeof(float));
 		assert(objects[0] != NULL);
-		for (i = 1; i<(*numObjs); i++)
+		for (i = 1; i < (*numObjs); i++)
+		{
 			objects[i] = objects[i - 1] + (*numCoords);
-
+		}
+			
 		i = 0;
-		/* read all objects */
-		while (fgets(line, lineLen, infile) != NULL) {
+		// read all objects 
+		while (fgets(line, lineLen, infile) != NULL) 
+		{
 			if (strtok(line, " \t\n") == NULL) continue;
-			for (j = 0; j<(*numCoords); j++)
+			for (j = 0; j < (*numCoords); j++)
 				objects[i][j] = atof(strtok(NULL, " ,\t\n"));
 			i++;
 		}
@@ -139,11 +144,11 @@ float** file_read(int   isBinaryFile,  // flag: 0 or 1
 }
 
 // file_write() 
-int file_write(char      *filename,     // input file name 
+int writeToFile(char      *filename,     // input file name 
 	int        numClusters,  // no. clusters 
 	int        numObjs,      // no. data objects 
 	int        numCoords,    // no. coordinates (local) 
-	float    **clusters,     // [numClusters][numCoords] centers */
+	float    **clusters,     // [numClusters][numCoords] centers 
 	int       *membership)   // [numObjs] 
 {
 	FILE *fptr;
@@ -189,9 +194,9 @@ static inline int nextPowerOfTwo(int n)
 }
 
 
-// square of Euclid distance between two multi-dimensional points
+// square of Euclidian distance between two multi-dimensional points
 __host__ __device__ inline static
-float euclid_dist_2(int    numCoords,
+float eucledianDistanceSquared(int    numCoords,
 	int    numObjs,
 	int    numClusters,
 	float *objects,     // [numCoords][numObjs]
@@ -202,16 +207,17 @@ float euclid_dist_2(int    numCoords,
 	int i;
 	float ans = 0.0;
 
-	for (i = 0; i < numCoords; i++) {
-		ans += (objects[numObjs * i + objectId] - clusters[numClusters * i + clusterId]) *
-			(objects[numObjs * i + objectId] - clusters[numClusters * i + clusterId]);
+	for (i = 0; i < numCoords; i++) 
+	{
+		//objects objects[numObjs * i + objectId] can be thought of as objects[i][objectId], so the ith coordinate for that objectId
+		ans += (objects[numObjs * i + objectId] - clusters[numClusters * i + clusterId]) * (objects[numObjs * i + objectId] - clusters[numClusters * i + clusterId]);		
 	}
 
 	return(ans);
 }
 
 __global__ static
-void find_nearest_cluster(int numCoords,
+void findNearestCluster(int numCoords,
 	int numObjs,
 	int numClusters,
 	float *objects,           //  [numCoords][numObjs]
@@ -222,7 +228,7 @@ void find_nearest_cluster(int numCoords,
 	extern __shared__ char sharedMemory[];
 
 	//  The type chosen for membershipChanged must be large enough to support
-	//  reductions! There are blockDim.x elements, one for each thread in the
+	//  reductions. There are blockDim.x elements, one for each thread in the
 	//  block. See numThreadsPerClusterBlock in cuda_kmeans().
 	unsigned char *membershipChanged = (unsigned char *)sharedMemory;
 
@@ -234,20 +240,23 @@ void find_nearest_cluster(int numCoords,
 
 	int objectId = blockDim.x * blockIdx.x + threadIdx.x;
 
-	if (objectId < numObjs) {
+	if (objectId < numObjs) 
+	{
 		int   index, i;
 		float dist, min_dist;
 
 		/* find the cluster id that has min distance to object */
 		index = 0;
-		min_dist = euclid_dist_2(numCoords, numObjs, numClusters,
+		min_dist = eucledianDistanceSquared(numCoords, numObjs, numClusters,
 			objects, clusters, objectId, 0);
 
-		for (i = 1; i<numClusters; i++) {
-			dist = euclid_dist_2(numCoords, numObjs, numClusters,
+		for (i = 1; i < numClusters; i++) 
+		{
+			dist = eucledianDistanceSquared(numCoords, numObjs, numClusters,
 				objects, clusters, objectId, i);
-			/* no need square root */
-			if (dist < min_dist) { /* find the min and its array index */
+			// do not need square root 
+			if (dist < min_dist) 
+			{ // find the min and its array index 
 				min_dist = dist;
 				index = i;
 			}
@@ -294,22 +303,22 @@ void compute_delta(int *deviceIntermediates,
 	__syncthreads();
 
 	//  numIntermediates2 *must* be a power of two!
-	for (unsigned int s = numIntermediates2 / 2; s > 0; s >>= 1) {
-		if (threadIdx.x < s) {
+	for (unsigned int s = numIntermediates2 / 2; s > 0; s >>= 1) 
+	{
+		if (threadIdx.x < s) 
+		{
 			intermediates[threadIdx.x] += intermediates[threadIdx.x + s];
 		}
 		__syncthreads();
 	}
 
-	if (threadIdx.x == 0) {
+	if (threadIdx.x == 0) 
+	{
 		deviceIntermediates[0] = intermediates[0];
 	}
 }
 
-/*----< cuda_kmeans() >-------------------------------------------------------*/
-//
-//  ----------------------------------------
-//  DATA LAYOUT
+//  Variable explanation
 //
 //  objects         [numObjs][numCoords]
 //  clusters        [numClusters][numCoords]
@@ -318,25 +327,25 @@ void compute_delta(int *deviceIntermediates,
 //  newClusters     [numCoords][numClusters]
 //  deviceObjects   [numCoords][numObjs]
 //  deviceClusters  [numCoords][numClusters]
-//  ----------------------------------------
 //
-/* return an array of cluster centers of size [numClusters][numCoords]       */
-float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
-	int     numCoords,    /* no. features */
-	int     numObjs,      /* no. objects */
-	int     numClusters,  /* no. clusters */
-	float   threshold,    /* % objects change membership */
-	int    *membership,   /* out: [numObjs] */
+// return an array of cluster centers of size [numClusters][numCoords]      
+
+float** CudaKmeans(float **objects,      // in: [numObjs][numCoords] 
+	int     numCoords,    // num of features for example RGB color is 3 coordinates
+	int     numObjs,      // num of objects 
+	int     numClusters,  // num of clusters 
+	float   threshold,    // objects change membership 
+	int    *membership,   // output [numObjs] 
 	int    *loop_iterations)
 {
 	int      i, j, index, loop = 0;
-	int     *newClusterSize; /* [numClusters]: no. objects assigned in each
-							 new cluster */
-	float    delta;          /* % of objects change their clusters */
+	int     *newClusterSize; // [numClusters]: no. objects assigned in each new cluster 
+							 
+	float    delta;          // % of objects change their clusters 
 	float  **dimObjects;
-	float  **clusters;       /* out: [numClusters][numCoords] */
+	float  **clusters;       // out: [numClusters][numCoords] 
 	float  **dimClusters;
-	float  **newClusters;    /* [numCoords][numClusters] */
+	float  **newClusters;    // [numCoords][numClusters] 
 
 	float *deviceObjects;
 	float *deviceClusters;
@@ -346,24 +355,31 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
 	//  Copy objects given in [numObjs][numCoords] layout to new
 	//  [numCoords][numObjs] layout
 	malloc2D(dimObjects, numCoords, numObjs, float);
-	for (i = 0; i < numCoords; i++) {
-		for (j = 0; j < numObjs; j++) {
+	for (i = 0; i < numCoords; i++) 
+	{
+		for (j = 0; j < numObjs; j++) 
+		{
 			dimObjects[i][j] = objects[j][i];
 		}
 	}
 
-	/* pick first numClusters elements of objects[] as initial cluster centers*/
+	// pick first numClusters elements of objects[] as initial cluster centers
 	malloc2D(dimClusters, numCoords, numClusters, float);
-	for (i = 0; i < numCoords; i++) {
-		for (j = 0; j < numClusters; j++) {
+	for (i = 0; i < numCoords; i++) 
+	{
+		for (j = 0; j < numClusters; j++) 
+		{
 			dimClusters[i][j] = dimObjects[i][j];
 		}
 	}
 
-	/* initialize membership[] */
-	for (i = 0; i<numObjs; i++) membership[i] = -1;
+	// initialize membership[] 
+	for (i = 0; i < numObjs; i++) 
+	{
+		membership[i] = -1;
+	}
 
-	/* need to initialize newClusterSize and newClusters[0] to all 0 */
+	// need to initialize newClusterSize and newClusters[0] to all 0 
 	newClusterSize = (int*)calloc(numClusters, sizeof(int));
 	assert(newClusterSize != NULL);
 
@@ -371,85 +387,81 @@ float** cuda_kmeans(float **objects,      /* in: [numObjs][numCoords] */
 	memset(newClusters[0], 0, numCoords * numClusters * sizeof(float));
 
 	//  To support reduction, numThreadsPerClusterBlock *must* be a power of
-	//  two, and it *must* be no larger than the number of bits that will
+	//  two, and it must be no larger than the number of bits that will
 	//  fit into an unsigned char, the type used to keep track of membership
 	//  changes in the kernel.
 	const unsigned int numThreadsPerClusterBlock = 128;
-	const unsigned int numClusterBlocks =
-		(numObjs + numThreadsPerClusterBlock - 1) / numThreadsPerClusterBlock;
+	const unsigned int numClusterBlocks = (numObjs + numThreadsPerClusterBlock - 1) / numThreadsPerClusterBlock;
+		
 
-	const unsigned int clusterBlockSharedDataSize =
-		numThreadsPerClusterBlock * sizeof(unsigned char);
+	const unsigned int clusterBlockSharedDataSize = numThreadsPerClusterBlock * sizeof(unsigned char);
+		
+	const unsigned int numReductionThreads = nextPowerOfTwo(numClusterBlocks);
+		
+	const unsigned int reductionBlockSharedDataSize = numReductionThreads * sizeof(unsigned int);
+	
 
-
-	const unsigned int numReductionThreads =
-		nextPowerOfTwo(numClusterBlocks);
-	const unsigned int reductionBlockSharedDataSize =
-		numReductionThreads * sizeof(unsigned int);
-
-	checkCuda(cudaMalloc(&deviceObjects, numObjs*numCoords*sizeof(float)));
-	checkCuda(cudaMalloc(&deviceClusters, numClusters*numCoords*sizeof(float)));
-	checkCuda(cudaMalloc(&deviceMembership, numObjs*sizeof(int)));
-	checkCuda(cudaMalloc(&deviceIntermediates, numReductionThreads*sizeof(unsigned int)));
+	checkCuda(cudaMalloc(&deviceObjects, numObjs * numCoords * sizeof(float)));
+	checkCuda(cudaMalloc(&deviceClusters, numClusters * numCoords * sizeof(float)));
+	checkCuda(cudaMalloc(&deviceMembership, numObjs * sizeof(int)));
+	checkCuda(cudaMalloc(&deviceIntermediates, numReductionThreads * sizeof(unsigned int)));
 
 	checkCuda(cudaMemcpy(deviceObjects, dimObjects[0],
 		numObjs*numCoords*sizeof(float), cudaMemcpyHostToDevice));
 	checkCuda(cudaMemcpy(deviceMembership, membership,
 		numObjs*sizeof(int), cudaMemcpyHostToDevice));
 
-	do {
-		checkCuda(cudaMemcpy(deviceClusters, dimClusters[0],
-			numClusters*numCoords*sizeof(float), cudaMemcpyHostToDevice));
+	do 
+	{
+		checkCuda(cudaMemcpy(deviceClusters, dimClusters[0], numClusters*numCoords*sizeof(float), cudaMemcpyHostToDevice));
 
-		find_nearest_cluster
-			<< < numClusterBlocks, numThreadsPerClusterBlock, clusterBlockSharedDataSize >> >
-			(numCoords, numObjs, numClusters,
-				deviceObjects, deviceClusters, deviceMembership, deviceIntermediates);
+		findNearestCluster
+			<< < numClusterBlocks, numThreadsPerClusterBlock, clusterBlockSharedDataSize >> >(numCoords, numObjs, numClusters, deviceObjects, deviceClusters, deviceMembership, deviceIntermediates);
 
-		cudaDeviceSynchronize(); checkLastCudaError();
-
-		compute_delta << < 1, numReductionThreads, reductionBlockSharedDataSize >> >
-			(deviceIntermediates, numClusterBlocks, numReductionThreads);
-
-		cudaDeviceSynchronize(); checkLastCudaError();
+		cudaDeviceSynchronize(); 
+		checkLastCudaError();
+		compute_delta << < 1, numReductionThreads, reductionBlockSharedDataSize >> >(deviceIntermediates, numClusterBlocks, numReductionThreads);
+		cudaDeviceSynchronize(); 
+		checkLastCudaError();
 
 		int d;
-		checkCuda(cudaMemcpy(&d, deviceIntermediates,
-			sizeof(int), cudaMemcpyDeviceToHost));
+		checkCuda(cudaMemcpy(&d, deviceIntermediates, sizeof(int), cudaMemcpyDeviceToHost));
 		delta = (float)d;
 
-		checkCuda(cudaMemcpy(membership, deviceMembership,
-			numObjs*sizeof(int), cudaMemcpyDeviceToHost));
+		checkCuda(cudaMemcpy(membership, deviceMembership, numObjs*sizeof(int), cudaMemcpyDeviceToHost));
 
-		for (i = 0; i<numObjs; i++) {
-			/* find the array index of nestest cluster center */
+		for (i = 0; i < numObjs; i++) 
+		{
+			// find the array index of nestest cluster center 
 			index = membership[i];
 
-			/* update new cluster centers : sum of objects located within */
+			// update new cluster centers : sum of objects located within
 			newClusterSize[index]++;
-			for (j = 0; j<numCoords; j++)
+			for (j = 0; j < numCoords; j++)
 				newClusters[j][index] += objects[i][j];
 		}
 
-		//  TODO: Flip the nesting order
-		//  TODO: Change layout of newClusters to [numClusters][numCoords]
-		/* average the sum and replace old cluster centers with newClusters */
-		for (i = 0; i<numClusters; i++) {
-			for (j = 0; j<numCoords; j++) {
-				if (newClusterSize[i] > 0)
+		// average the sum and replace old cluster centers with newClusters 
+		for (i = 0; i < numClusters; i++) 
+		{
+			for (j = 0; j < numCoords; j++) 
+			{
+				if (newClusterSize[i] > 0) 
+				{
 					dimClusters[j][i] = newClusters[j][i] / newClusterSize[i];
-				newClusters[j][i] = 0.0;   /* set back to 0 */
+				}					
+				newClusters[j][i] = 0.0;   // set back to 0 
 			}
-			newClusterSize[i] = 0;   /* set back to 0 */
+			newClusterSize[i] = 0;   // set back to 0 
 		}
 
 		delta /= numObjs;
-	} while (delta > threshold && loop++ < 500);
+	} while (delta > threshold && loop++ < 500); // 500 is max number of iterations
 
 	*loop_iterations = loop + 1;
 
-	/* allocate a 2D space for returning variable clusters[] (coordinates
-	of cluster centers) */
+	// allocate a 2D space for returning variable clusters[] (coordinatesof cluster centers) 
+	
 	malloc2D(clusters, numClusters, numCoords, float);
 	for (i = 0; i < numClusters; i++) {
 		for (j = 0; j < numCoords; j++) {
@@ -477,10 +489,10 @@ int main(int argc, char **argv)
 	int     isBinaryFile, is_output_timing;
 
 	int     numClusters, numCoords, numObjs;
-	int    *membership;    /* [numObjs] */
+	int    *membership;    // [numObjs] 
 	char   *filename;
-	float **objects;       /* [numObjs][numCoords] data objects */
-	float **clusters;      /* [numClusters][numCoords] cluster center */
+	float **objects;       // [numObjs][numCoords] data objects 
+	float **clusters;      // [numClusters][numCoords] cluster center 
 	float   threshold;
 	double  timing, io_timing, clustering_timing;
 	int     loop_iterations;
@@ -498,42 +510,45 @@ int main(int argc, char **argv)
 	numClusters = atoi(argv[2]);
 	if (is_output_timing) io_timing = clock();
 
-	/* read data points from file ------------------------------------------*/
-	objects = file_read(isBinaryFile, filename, &numObjs, &numCoords);
+	// read data points from file 
+	objects = readFromFile(isBinaryFile, filename, &numObjs, &numCoords);
 	if (objects == NULL) exit(1);
 
-	if (is_output_timing) {
+	if (is_output_timing) 
+	{
 		timing = clock();
 		io_timing = timing - io_timing;
 		clustering_timing = timing;
 	}
 
-	/* start the timer for the core computation -----------------------------*/
-	/* membership: the cluster id for each data object */
+	// start the timer for the core computation
+	// membership: the cluster id for each data object 
 	membership = (int*)malloc(numObjs * sizeof(int));
 	assert(membership != NULL);
 
-	clusters = cuda_kmeans(objects, numCoords, numObjs, numClusters, threshold,
+	clusters = CudaKmeans(objects, numCoords, numObjs, numClusters, threshold,
 		membership, &loop_iterations);
 
 	free(objects[0]);
 	free(objects);
 
-	if (is_output_timing) {
+	if (is_output_timing) 
+	{
 		timing = clock();
 		clustering_timing = (timing - clustering_timing) / CLOCKS_PER_SEC;
 	}
 
-	/* output: the coordinates of the cluster centres ----------------------*/
-	file_write(filename, numClusters, numObjs, numCoords, clusters,
+	// output: the coordinates of the cluster centres
+	writeToFile(filename, numClusters, numObjs, numCoords, clusters,
 		membership);
 
 	free(membership);
 	free(clusters[0]);
 	free(clusters);
 
-	/*---- output performance numbers ---------------------------------------*/
-	if (is_output_timing) {
+	// output performance number..You can also see kernel execution time in Visual Studio 2017
+	if (is_output_timing) 
+	{
 		io_timing += clock() - timing;
 		printf("\nPerforming **** Regular Kmeans (CUDA version) ****\n");
 
