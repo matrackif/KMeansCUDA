@@ -265,12 +265,12 @@ void findNearestCluster(int numCoords,
 			membershipChanged[threadIdx.x] = 1;
 		}
 
-		/* assign the membership to object objectId */
+		// assign the membership to object objectId 
 		membership[objectId] = index;
 
 		__syncthreads();    //  For membershipChanged[]
 
-							//  blockDim.x *must* be a power of two!
+		//  blockDim.x *must* be a power of two!
 		for (unsigned int s = blockDim.x / 2; s > 0; s >>= 1) 
 		{
 			if (threadIdx.x < s) 
@@ -406,12 +406,12 @@ float** CudaKmeans(float **objects,      // in: [numObjs][numCoords]
 	checkCuda(cudaMalloc(&deviceMembership, numObjs * sizeof(int)), "allocating device memship");
 	checkCuda(cudaMalloc(&deviceIntermediates, numReductionThreads * sizeof(unsigned int)), "allocating device intermediates");
 
-	checkCuda(cudaMemcpy(deviceObjects, dimObjects[0],	numObjs*numCoords*sizeof(float), cudaMemcpyHostToDevice), "memcpy dimObjects[0] -> device objects");
-	checkCuda(cudaMemcpy(deviceMembership, membership,	numObjs*sizeof(int), cudaMemcpyHostToDevice), "memcpy membership -> device membership");
+	checkCuda(cudaMemcpy(deviceObjects, dimObjects[0],	numObjs * numCoords * sizeof(float), cudaMemcpyHostToDevice), "memcpy dimObjects[0] -> device objects");
+	checkCuda(cudaMemcpy(deviceMembership, membership,	numObjs * sizeof(int), cudaMemcpyHostToDevice), "memcpy membership -> device membership");
 
 	do 
 	{
-		checkCuda(cudaMemcpy(deviceClusters, dimClusters[0], numClusters*numCoords*sizeof(float), cudaMemcpyHostToDevice), "memcpy dimClusters[0] -> device clusters");
+		checkCuda(cudaMemcpy(deviceClusters, dimClusters[0], numClusters * numCoords * sizeof(float), cudaMemcpyHostToDevice), "memcpy dimClusters[0] -> device clusters");
 		printf("(for findNearestCluster) numClusterBlocks: %d, numThreadsPerClusterBlock: %d, clusterBlockSharedDataSize: %d \n", numClusterBlocks, numThreadsPerClusterBlock, clusterBlockSharedDataSize);
 		findNearestCluster
 			<< < numClusterBlocks, numThreadsPerClusterBlock, clusterBlockSharedDataSize >> >(numCoords, numObjs, numClusters, deviceObjects, deviceClusters, deviceMembership, deviceIntermediates);
@@ -438,7 +438,9 @@ float** CudaKmeans(float **objects,      // in: [numObjs][numCoords]
 			// update new cluster centers : sum of objects located within
 			newClusterSize[index]++;
 			for (j = 0; j < numCoords; j++)
+			{
 				newClusters[j][index] += objects[i][j];
+			}				
 		}
 
 		// average the sum and replace old cluster centers with newClusters 
@@ -529,7 +531,7 @@ int main(int argc, char **argv)
 	assert(membership != NULL);
 
 	clusters = CudaKmeans(objects, numCoords, numObjs, numClusters, threshold,
-		membership, &loop_iterations);
+						  membership, &loop_iterations);
 
 	free(objects[0]);
 	free(objects);
