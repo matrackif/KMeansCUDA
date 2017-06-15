@@ -15,17 +15,18 @@
         name[i] = name[i-1] + yDim;                         \
 } while (0)
 
-inline void checkCuda(cudaError_t e) {
+inline void checkCuda(cudaError_t e, const char* what) 
+{
 	if (e != cudaSuccess) {
 		// cudaGetErrorString() isn't always very helpful. Look up the error
 		// number in the cudaError enum in driver_types.h in the CUDA includes
 		// directory for a better explanation.
-		err("CUDA Error %d: %s\n", e, cudaGetErrorString(e));
+		err("CUDA Error %d in %s: %s\n", e, cudaGetErrorString(e), what);
 	}
 }
 
-inline void checkLastCudaError() {
-	checkCuda(cudaGetLastError());
+inline void checkLastCudaError(const char* problem) {
+	checkCuda(cudaGetLastError(), problem);
 }
 
 
